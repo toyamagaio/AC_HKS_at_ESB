@@ -269,13 +269,11 @@ void AC_ana::loop(){
     //AC//
     //////
     if(noise_flag){//noise ch(A07 ) is available after run1425
-      ac_npe_t = paramMan->npe(CID_AC, 1,0, acadc_t[0] - noise_adc);
-      ac_npe_b = paramMan->npe(CID_AC, 1,1, acadc_b[0] - noise_adc);
+      acadc_t[0] -= noise_adc;
+      acadc_b[0] -= noise_adc;
     }
-    else{
-      ac_npe_t = paramMan->npe(CID_AC, 1,0, acadc_t[0]);
-      ac_npe_b = paramMan->npe(CID_AC, 1,1, acadc_b[0]);
-    }
+    ac_npe_t = paramMan->npe(CID_AC, 1,0, acadc_t[0]);
+    ac_npe_b = paramMan->npe(CID_AC, 1,1, acadc_b[0]);
     ac_npe_sum = ac_npe_t + ac_npe_b;
     ac_time_t = paramMan->time(CID_AC, 1,0, actdc_t[0]);
     ac_time_b = paramMan->time(CID_AC, 1,1, actdc_b[0]);
