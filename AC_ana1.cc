@@ -97,8 +97,18 @@ class AC_ana : public Tree
     int ENum;
     bool noise_flag;
 
+
+    //////////////
+    //Parameters//
+    //////////////
     double tr1t_Qmin, tr1b_Qmin, tr2t_Qmin, tr2b_Qmin;
     double tr1t_Qmax, tr1b_Qmax, tr2t_Qmax, tr2b_Qmax;
+    double tr1_Tdiff_min, tr2_Tdiff_min, ToF_min;
+    double tr1_Tdiff_max, tr2_Tdiff_max, ToF_max;
+    double npe_th[5];//threshold paramter of NPE
+    double counter_th[5], counter_all;
+
+
 
     TH1F *h_ctime;
     TH1F *h_TDC_Trig1t, *h_TDC_Trig1b, *h_TDC_Trig2t, *h_TDC_Trig2b;
@@ -179,6 +189,22 @@ AC_ana::AC_ana()
   tr1b_Qmax = 1400.;
   tr2t_Qmax = 2500.;
   tr2b_Qmax = 2500.;
+  tr1_Tdiff_min = -0.7;
+  tr2_Tdiff_min =  0.0;
+  ToF_min       = -0.1;
+  tr1_Tdiff_max =  0.3;
+  tr2_Tdiff_max =  0.5;
+  ToF_max       =  0.5;
+
+  npe_th[0] = 0.5;
+  npe_th[1] = 1.0;
+  npe_th[2] = 2.0;
+  npe_th[3] = 3.0;
+  npe_th[4] = 5.0;
+  for(int i=0;i<5;i++){
+    counter_th[i]=0.;
+  }
+  counter_all = 0.;
 }
 ////////////////////////////////////////////////////////////////////////////
 AC_ana::~AC_ana(){
@@ -242,8 +268,8 @@ void AC_ana::makehist(){
   set->SetTH1(h_Q_Trig1b     ,"Trig1b QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
   set->SetTH1(h_Q_Trig2t     ,"Trig2t QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
   set->SetTH1(h_Q_Trig2b     ,"Trig2b QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
-  set->SetTH1(h_Tdiff_Trig1  ,"TDiff Trig1"         ,"time [ns]"   , "counts"   ,1,0,0);//LColor,FStyle,FColor
-  set->SetTH1(h_Tdiff_Trig2  ,"TDiff Trig2"         ,"time [ns]"   , "counts"   ,1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Tdiff_Trig1  ,"Tdiff Trig1"         ,"time [ns]"   , "counts"   ,1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Tdiff_Trig2  ,"Tdiff Trig2"         ,"time [ns]"   , "counts"   ,1,0,0);//LColor,FStyle,FColor
   
 
   h_TDC_AC1t      = new TH1F("h_TDC_AC1t"     ,"h_TDC_AC1t"   ,4000,   0, 4000);
@@ -375,11 +401,19 @@ void AC_ana::loop(){
     h2_Qtr2t_npe  ->Fill(tofadc_t[1],ac_npe_sum);
     h2_Qtr2b_npe  ->Fill(tofadc_b[1],ac_npe_sum);
 
-    if(tofadc_t[0]>tr1t_Qmin && tofadc_t[0]<tr1t_Qmax &&
-       tofadc_b[0]>tr1b_Qmin && tofadc_b[0]<tr1b_Qmax &&
-       tofadc_t[1]>tr2t_Qmin && tofadc_t[1]<tr2t_Qmax &&
-       tofadc_b[1]>tr2b_Qmin && tofadc_b[1]<tr2b_Qmax){
+    if(tofadc_t[0]>tr1t_Qmin     && tofadc_t[0]<tr1t_Qmax     &&
+       tofadc_b[0]>tr1b_Qmin     && tofadc_b[0]<tr1b_Qmax     &&
+       tofadc_t[1]>tr2t_Qmin     && tofadc_t[1]<tr2t_Qmax     &&
+       tofadc_b[1]>tr2b_Qmin     && tofadc_b[1]<tr2b_Qmax     &&
+       tr_tof     >ToF_min       && tr_tof     <ToF_max       &&
+       tr1_Tdiff  >tr1_Tdiff_min && tr1_Tdiff  <tr1_Tdiff_max &&
+       tr2_Tdiff  >tr2_Tdiff_min && tr2_Tdiff  <tr2_Tdiff_max
+      ){
       hc_npe_AC1sum ->Fill(ac_npe_sum);
+      counter_all += 1.;
+      for(int i=0;i<5;i++){
+        if(ac_npe_sum>npe_th[i])counter_th[i]+=1.;
+      }
     } 
 
     ///////////////
@@ -412,6 +446,11 @@ void AC_ana::loop(){
     }
   }//event loop
 
+  cout<<"***** Efficiency *****"<<endl;
+  cout<<"NPE threshold  fired ev  total  eff" <<endl;
+  for(int i=0;i<5;i++){
+    cout<<npe_th[i] <<"  "<< counter_th[i] <<"  "<< counter_all<<"  "<< counter_th[i]/counter_all<<endl;
+  }
   ofp->Write();
 }
 ////////////////////////////////////////////////////////////////////////////
@@ -432,7 +471,10 @@ void AC_ana::draw(){
   c1->cd(8); gPad->SetLogy(1);h_Q_Trig2b      ->Draw();
   c1->cd(9); gPad->SetLogy(1);h_Tdiff_Trig1   ->Draw();
   c1->cd(10);gPad->SetLogy(1);h_Tdiff_Trig2   ->Draw();
-  c1->cd(11);gPad->SetLogz(1);h2_Tdiff_Trig12 ->Draw("colz");
+  c1->cd(11);gPad->SetLogz(1);h2_Tdiff_Trig12 ->Draw("colz");line_mage->DrawLine(tr1_Tdiff_min,tr2_Tdiff_min,tr1_Tdiff_min,tr2_Tdiff_max);
+                                                             line_mage->DrawLine(tr1_Tdiff_max,tr2_Tdiff_min,tr1_Tdiff_max,tr2_Tdiff_max);
+                                                             line_mage->DrawLine(tr1_Tdiff_min,tr2_Tdiff_min,tr1_Tdiff_max,tr2_Tdiff_min);
+                                                             line_mage->DrawLine(tr1_Tdiff_min,tr2_Tdiff_max,tr1_Tdiff_max,tr2_Tdiff_max);
   c2->Clear();
   c2->Divide(4,4);
   c2->cd(1); gPad->SetLogy(1);h_TDC_AC1t    ->Draw();
@@ -442,13 +484,20 @@ void AC_ana::draw(){
   c2->cd(5); gPad->SetLogy(1);h_npe_AC1t    ->Draw();
   c2->cd(6); gPad->SetLogy(1);h_npe_AC1b    ->Draw();
   c2->cd(7); gPad->SetLogy(1);h_npe_AC1sum  ->Draw();hc_npe_AC1sum ->Draw("same");
-  c2->cd(8); gPad->SetLogz(1);h2_tof_npe    ->Draw("colz");
-  c2->cd(9); gPad->SetLogz(1);h2_Tdiff1_npe ->Draw("colz");
-  c2->cd(10);gPad->SetLogz(1);h2_Tdiff2_npe ->Draw("colz");
+  c2->cd(8); gPad->SetLogz(1);h2_tof_npe    ->Draw("colz");line_mage->DrawLine(ToF_min,h2_tof_npe ->GetYaxis()->GetXmin(),ToF_min,h2_tof_npe ->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(ToF_max,h2_tof_npe ->GetYaxis()->GetXmin(),ToF_max,h2_tof_npe ->GetYaxis()->GetXmax());
+  c2->cd(9); gPad->SetLogz(1);h2_Tdiff1_npe ->Draw("colz");line_mage->DrawLine(tr1_Tdiff_min,h2_Tdiff1_npe ->GetYaxis()->GetXmin(),tr1_Tdiff_min,h2_Tdiff1_npe->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(tr1_Tdiff_max,h2_Tdiff1_npe ->GetYaxis()->GetXmin(),tr1_Tdiff_max,h2_Tdiff1_npe->GetYaxis()->GetXmax());
+  c2->cd(10);gPad->SetLogz(1);h2_Tdiff2_npe ->Draw("colz");line_mage->DrawLine(tr2_Tdiff_min,h2_Tdiff2_npe ->GetYaxis()->GetXmin(),tr2_Tdiff_min,h2_Tdiff2_npe->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(tr2_Tdiff_max,h2_Tdiff2_npe ->GetYaxis()->GetXmin(),tr2_Tdiff_max,h2_Tdiff2_npe->GetYaxis()->GetXmax());
   c2->cd(11);gPad->SetLogz(1);h2_Qtr1t_npe  ->Draw("colz");line_mage->DrawLine(tr1t_Qmin,h2_Qtr1t_npe->GetYaxis()->GetXmin(),tr1t_Qmin,h2_Qtr1t_npe->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(tr1t_Qmax,h2_Qtr1t_npe->GetYaxis()->GetXmin(),tr1t_Qmax,h2_Qtr1t_npe->GetYaxis()->GetXmax());
   c2->cd(12);gPad->SetLogz(1);h2_Qtr1b_npe  ->Draw("colz");line_mage->DrawLine(tr1b_Qmin,h2_Qtr1b_npe->GetYaxis()->GetXmin(),tr1b_Qmin,h2_Qtr1b_npe->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(tr1b_Qmax,h2_Qtr1b_npe->GetYaxis()->GetXmin(),tr1b_Qmax,h2_Qtr1b_npe->GetYaxis()->GetXmax());
   c2->cd(13);gPad->SetLogz(1);h2_Qtr2t_npe  ->Draw("colz");line_mage->DrawLine(tr2t_Qmin,h2_Qtr2t_npe->GetYaxis()->GetXmin(),tr2t_Qmin,h2_Qtr2t_npe->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(tr2t_Qmax,h2_Qtr2t_npe->GetYaxis()->GetXmax(),tr2t_Qmax,h2_Qtr2t_npe->GetYaxis()->GetXmax());
   c2->cd(14);gPad->SetLogz(1);h2_Qtr2b_npe  ->Draw("colz");line_mage->DrawLine(tr2b_Qmin,h2_Qtr2b_npe->GetYaxis()->GetXmin(),tr2b_Qmin,h2_Qtr2b_npe->GetYaxis()->GetXmax());
+                                                           line_mage->DrawLine(tr2b_Qmax,h2_Qtr2b_npe->GetYaxis()->GetXmax(),tr2b_Qmax,h2_Qtr2b_npe->GetYaxis()->GetXmax());
   c2->cd(15);gPad->SetLogy(1);hc_npe_AC1sum ->Draw();
     
   c3->Clear();
