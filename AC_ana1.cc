@@ -34,6 +34,7 @@ using namespace std;
 #include "define.h"
 #include "Tree.h"
 #include "ParamMan.h"
+#include "Setting.h"
 
 #define Calibration
 
@@ -83,9 +84,11 @@ class AC_ana : public Tree
     void SetRoot(string ifname);
     void SetParamFile(string paramname);
     void SetOutputRoot(string ofname);
+    bool CheckADCRange(double adc);
 
   private:
     ParamMan *paramMan;
+    Setting *set;
     TFile *ofp;
     TTree *tree_out;
     string input_param;
@@ -94,16 +97,24 @@ class AC_ana : public Tree
     int ENum;
     bool noise_flag;
 
+    double tr1t_Qmin, tr1b_Qmin, tr2t_Qmin, tr2b_Qmin;
+    double tr1t_Qmax, tr1b_Qmax, tr2t_Qmax, tr2b_Qmax;
+
     TH1F *h_ctime;
     TH1F *h_TDC_Trig1t, *h_TDC_Trig1b, *h_TDC_Trig2t, *h_TDC_Trig2b;
     TH1F *h_Q_Trig1t, *h_Q_Trig1b, *h_Q_Trig2t, *h_Q_Trig2b;
+    TH1F *h_Tdiff_Trig1, *h_Tdiff_Trig2;
 
     TH1F *h_TDC_AC1t, *h_TDC_AC1b, *h_Q_AC1t, *h_Q_AC1b;
-    TH1F *h_npe_AC1t, *h_npe_AC1b, *h_npe_AC1sum;
+    TH1F *h_npe_AC1t, *h_npe_AC1b, *h_npe_AC1sum, *hc_npe_AC1sum;
 
+    TH2F *h2_tof_npe, *h2_Tdiff1_npe, *h2_Tdiff2_npe;
+    TH2F *h2_Qtr1t_npe, *h2_Qtr1b_npe, *h2_Qtr2t_npe, *h2_Qtr2b_npe;  
     TH2F *h2_QI_Trig1t, *h2_QI_Trig1b, *h2_QI_Trig2t, *h2_QI_Trig2b;
     TH2F *h2_QT_Trig1t, *h2_QT_Trig1b, *h2_QT_Trig2t, *h2_QT_Trig2b;
+    TH2F *h2_Tdiff_Trig12, *h2c_Tdiff_Trig12;
 
+    TLine *line_mage;
     int run_num;
     TCanvas *c1,*c2,*c3,*c4,*c5;
 };
@@ -148,6 +159,11 @@ AC_ana::AC_ana()
   //TColor::CreateGradientColorTable(NRGBs, stops, red, green, blue, NCont);
   //gStyle->SetNumberContours(NCont);
       
+  set = new Setting();
+  line_mage = new TLine();
+  line_mage ->SetLineColor(6);
+  line_mage ->SetLineWidth(1);
+  line_mage ->SetLineStyle(1);
 
   c1= new TCanvas("c1","c1",1400,800 );
   c2= new TCanvas("c2","c2",1400,800 );
@@ -155,6 +171,14 @@ AC_ana::AC_ana()
   c4= new TCanvas("c4","c4",1400,800 );
   c5= new TCanvas("c5","c5",1400,800 );
 
+  tr1t_Qmin = 800.;
+  tr1b_Qmin = 700.;
+  tr2t_Qmin = 800.;
+  tr2b_Qmin = 750.;
+  tr1t_Qmax = 1600.;
+  tr1b_Qmax = 1400.;
+  tr2t_Qmax = 2500.;
+  tr2b_Qmax = 2500.;
 }
 ////////////////////////////////////////////////////////////////////////////
 AC_ana::~AC_ana(){
@@ -208,6 +232,20 @@ void AC_ana::makehist(){
   h_Q_Trig1b      = new TH1F("h_Q_Trig1b"     ,"h_Q_Trig1b"   ,1500,   0, 1500);
   h_Q_Trig2t      = new TH1F("h_Q_Trig2t"     ,"h_Q_Trig2t"   ,1500,   0, 1500);
   h_Q_Trig2b      = new TH1F("h_Q_Trig2b"     ,"h_Q_Trig2b"   ,1500,   0, 1500);
+  h_Tdiff_Trig1   = new TH1F("h_Tdiff_Trig1"  ,"h_Tdiff_Trig1", 500, -10,   10);
+  h_Tdiff_Trig2   = new TH1F("h_Tdiff_Trig2"  ,"h_Tdiff_Trig2", 500, -10,   10);
+  set->SetTH1(h_TDC_Trig1t   ,"Trig1t TDC"          ,"TDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_TDC_Trig1b   ,"Trig1b TDC"          ,"TDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_TDC_Trig2t   ,"Trig2t TDC"          ,"TDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_TDC_Trig2b   ,"Trig2b TDC"          ,"TDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Q_Trig1t     ,"Trig1t QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Q_Trig1b     ,"Trig1b QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Q_Trig2t     ,"Trig2t QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Q_Trig2b     ,"Trig2b QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Tdiff_Trig1  ,"TDiff Trig1"         ,"time [ns]"   , "counts"   ,1,0,0);//LColor,FStyle,FColor
+  set->SetTH1(h_Tdiff_Trig2  ,"TDiff Trig2"         ,"time [ns]"   , "counts"   ,1,0,0);//LColor,FStyle,FColor
+  
+
   h_TDC_AC1t      = new TH1F("h_TDC_AC1t"     ,"h_TDC_AC1t"   ,4000,   0, 4000);
   h_TDC_AC1b      = new TH1F("h_TDC_AC1b"     ,"h_TDC_AC1b"   ,4000,   0, 4000);
   h_Q_AC1t        = new TH1F("h_Q_AC1t"       ,"h_Q_AC1t"     ,1500,   0, 1500);
@@ -215,17 +253,51 @@ void AC_ana::makehist(){
   h_npe_AC1t      = new TH1F("h_npe_AC1t"     ,"h_npe_AC1t"   , 100,  -2,   20);
   h_npe_AC1b      = new TH1F("h_npe_AC1b"     ,"h_npe_AC1b"   , 100,  -2,   20);
   h_npe_AC1sum    = new TH1F("h_npe_AC1sum"   ,"h_npe_AC1sum" , 250,  -2,   50);
+  hc_npe_AC1sum   = new TH1F("hc_npe_AC1sum"  ,"hc_npe_AC1sum", 250,  -2,   50);
+  set->SetTH1(h_TDC_AC1t     ,"AC top TDC"          ,"TDC [ch]"    , "counts/ch",1,0,0);
+  set->SetTH1(h_TDC_AC1b     ,"AC bottom TDC"       ,"TDC [ch]"    , "counts/ch",1,0,0);
+  set->SetTH1(h_Q_AC1t       ,"AC top QDC"          ,"QDC [ch]"    , "counts/ch",1,0,0);
+  set->SetTH1(h_Q_AC1b       ,"AC bottom QDC"       ,"QDC [ch]"    , "counts/ch",1,0,0);
+  set->SetTH1(h_npe_AC1t     ,"AC top NPE"          ,"Num. of P.E.", "counts"   ,1,0,0);
+  set->SetTH1(h_npe_AC1b     ,"AC bottom NPE"       ,"Num. of P.E.", "counts"   ,1,0,0);
+  set->SetTH1(h_npe_AC1sum   ,"AC NPE sum"          ,"Num. of P.E.", "counts"   ,1,0,0);
+  set->SetTH1(hc_npe_AC1sum  ,"AC NPE sum(w/ cut)"  ,"Num. of P.E.", "counts"   ,4,0,0);
 
-  h2_QI_Trig1t    = new TH2F("h2_QI_Trig1t","h2_QI_Trig1t",200,   0, 50,1501,5000,15000);
-  h2_QI_Trig1b    = new TH2F("h2_QI_Trig1b","h2_QI_Trig1b",200,   0, 50,1501,5000,15000);
-  h2_QI_Trig2t    = new TH2F("h2_QI_Trig2t","h2_QI_Trig2t",200,   0, 50,1501,5000,15000);
-  h2_QI_Trig2b    = new TH2F("h2_QI_Trig2b","h2_QI_Trig2b",200,   0, 50,1501,5000,15000);
-  h2_QT_Trig1t    = new TH2F("h2_QT_Trig1t","h2_QT_Trig1t",200,-100,100,1501,5000,15000);
-  h2_QT_Trig1b    = new TH2F("h2_QT_Trig1b","h2_QT_Trig1b",200,-100,100,1501,5000,15000);
-  h2_QT_Trig2t    = new TH2F("h2_QT_Trig2t","h2_QT_Trig2t",200,-100,100,1501,5000,15000);
-  h2_QT_Trig2b    = new TH2F("h2_QT_Trig2b","h2_QT_Trig2b",200,-100,100,1501,5000,15000);
+  h2_tof_npe      = new TH2F("h2_tof_npe"      ,"h2_tof_npe"      ,1000,  -5,   5, 220,  -2,   20);
+  h2_Tdiff1_npe   = new TH2F("h2_Tdiff1_npe"   ,"h2_Tdiff1_npe"   , 400,  -2,   2, 220,  -2,   20);
+  h2_Tdiff2_npe   = new TH2F("h2_Tdiff2_npe"   ,"h2_Tdiff2_npe"   , 400,  -2,   2, 220,  -2,   20);
+  h2_Qtr1t_npe    = new TH2F("h2_Qtr1t_npe"    ,"h2_Qtr1t_npe"    , 400, 400,2000, 220,  -2,   20);
+  h2_Qtr1b_npe    = new TH2F("h2_Qtr1b_npe"    ,"h2_Qtr1b_npe"    , 400, 400,2000, 220,  -2,   20);
+  h2_Qtr2t_npe    = new TH2F("h2_Qtr2t_npe"    ,"h2_Qtr2t_npe"    , 400, 400,2000, 220,  -2,   20);
+  h2_Qtr2b_npe    = new TH2F("h2_Qtr2b_npe"    ,"h2_Qtr2b_npe"    , 400, 400,2000, 220,  -2,   20);
+  h2_QI_Trig1t    = new TH2F("h2_QI_Trig1t"    ,"h2_QI_Trig1t"    , 200,    0, 50,1501,5000,15000);
+  h2_QI_Trig1b    = new TH2F("h2_QI_Trig1b"    ,"h2_QI_Trig1b"    , 200,    0, 50,1501,5000,15000);
+  h2_QI_Trig2t    = new TH2F("h2_QI_Trig2t"    ,"h2_QI_Trig2t"    , 200,    0, 50,1501,5000,15000);
+  h2_QI_Trig2b    = new TH2F("h2_QI_Trig2b"    ,"h2_QI_Trig2b"    , 200,    0, 50,1501,5000,15000);
+  h2_QT_Trig1t    = new TH2F("h2_QT_Trig1t"    ,"h2_QT_Trig1t"    , 200, -100,100,1501,5000,15000);
+  h2_QT_Trig1b    = new TH2F("h2_QT_Trig1b"    ,"h2_QT_Trig1b"    , 200, -100,100,1501,5000,15000);
+  h2_QT_Trig2t    = new TH2F("h2_QT_Trig2t"    ,"h2_QT_Trig2t"    , 200, -100,100,1501,5000,15000);
+  h2_QT_Trig2b    = new TH2F("h2_QT_Trig2b"    ,"h2_QT_Trig2b"    , 200, -100,100,1501,5000,15000);
+  h2_Tdiff_Trig12 = new TH2F("h2_Tdiff_Trig12" ,"h2_Tdiff_Trig12" , 500,  -2, 2, 500, -2,   2);
+  h2c_Tdiff_Trig12= new TH2F("h2c_Tdiff_Trig12","h2c_Tdiff_Trig12", 500,  -10, 10, 500, -10,   10);
+  set->SetTH2(h2_tof_npe      ,"ToF vs NPE"         ,"ToF [ns]"  , "Num. of P.E." );
+  set->SetTH2(h2_Tdiff1_npe   ,"Tdiff1 vs NPE"      ,"Tdiff [ns]", "Num. of P.E." );
+  set->SetTH2(h2_Tdiff2_npe   ,"Tdiff2 vs NPE"      ,"Tdiff [ns]", "Num. of P.E." );
+  set->SetTH2(h2_Qtr1t_npe    ,"Q Tr1t vs NPE"      ,"QDC [ch]"  , "Num. of P.E." );
+  set->SetTH2(h2_Qtr1b_npe    ,"Q Tr1b vs NPE"      ,"QDC [ch]"  , "Num. of P.E." );
+  set->SetTH2(h2_Qtr2t_npe    ,"Q Tr2t vs NPE"      ,"QDC [ch]"  , "Num. of P.E." );
+  set->SetTH2(h2_Qtr2b_npe    ,"Q Tr2b vs NPE"      ,"QDC [ch]"  , "Num. of P.E." );
+  set->SetTH2(h2_QI_Trig1t    ,"QI_Trig1t"      ,"", "" );
+  set->SetTH2(h2_QI_Trig1b    ,"QI_Trig1b"      ,"", "" );
+  set->SetTH2(h2_QI_Trig2t    ,"QI_Trig2t"      ,"", "" );
+  set->SetTH2(h2_QI_Trig2b    ,"QI_Trig2b"      ,"", "" );
+  set->SetTH2(h2_QT_Trig1t    ,"Q Trig1t vs ToF"  ,"ToF [ns]", "QDC [ch]" );
+  set->SetTH2(h2_QT_Trig1b    ,"Q Trig1b vs ToF"  ,"ToF [ns]", "QDC [ch]" );
+  set->SetTH2(h2_QT_Trig2t    ,"Q Trig2t vs ToF"  ,"ToF [ns]", "QDC [ch]" );
+  set->SetTH2(h2_QT_Trig2b    ,"Q Trig2b vs ToF"  ,"ToF [ns]", "QDC [ch]" );
+  set->SetTH2(h2_Tdiff_Trig12 ,"Tdiff Trig1 vs Trig2"  ,"Tr1 Tdiff [ns]", "Tr2 Tdiff [ns]" );
+  set->SetTH2(h2c_Tdiff_Trig12,"Tdiff Trig1 vs Trig2"  ,"Tr1 Tdiff [ns]", "Tr2 Tdiff [ns]" );
 
-  
 }
 ////////////////////////////////////////////////////////////////////////////
 void AC_ana::loop(){
@@ -235,9 +307,12 @@ void AC_ana::loop(){
     //tree->GetEntry(n);
     read_one_event(n);
     if(n%100==0) cout<<n<<" / "<<ENum<<endl;
+    if(noise_flag && (NDataA07!=1 || NDataA04!=1 || NDataA05!=1) && !CheckADCRange(noise_adc))continue;
+    if(!noise_flag && (NDataA04!=1 || NDataA05!=1))continue;
     double ac_npe_t , ac_npe_b , ac_npe_sum;
     double ac_time_t , ac_time_b;
     double tr_time_t[2], tr_time_b[2];
+    double tr_tof, tr1_Tdiff, tr2_Tdiff;
 
     ac_npe_t = ac_npe_b = ac_npe_sum = -99.;
     ac_time_t = ac_time_b = -99.;
@@ -264,7 +339,13 @@ void AC_ana::loop(){
       tr_time_t[i] = paramMan->time(CID_ToF, i+1,0,toftdc_t[i]);
       tr_time_b[i] = paramMan->time(CID_ToF, i+1,1,toftdc_b[i]);
     }
+    tr_tof   = (tr_time_t[0]+tr_time_b[0])/2. -(tr_time_t[1]+tr_time_b[1])/2.;  
+    tr1_Tdiff = tr_time_t[0]-tr_time_b[0];  
+    tr2_Tdiff = tr_time_t[1]-tr_time_b[1];  
 
+    h_Tdiff_Trig1   ->Fill(tr1_Tdiff);
+    h_Tdiff_Trig2   ->Fill(tr2_Tdiff);
+    h2_Tdiff_Trig12 ->Fill(tr1_Tdiff,tr2_Tdiff);
     //////
     //AC//
     //////
@@ -282,10 +363,24 @@ void AC_ana::loop(){
     h_Q_AC1t      ->Fill(acadc_t[0]);
     h_Q_AC1b      ->Fill(acadc_b[0]);
     //if(NDataT04>0 && NDataT05>0){
-      h_npe_AC1t    ->Fill(ac_npe_t);
-      h_npe_AC1b    ->Fill(ac_npe_b);
-      h_npe_AC1sum  ->Fill(ac_npe_sum);
+    h_npe_AC1t    ->Fill(ac_npe_t);
+    h_npe_AC1b    ->Fill(ac_npe_b);
+    h_npe_AC1sum  ->Fill(ac_npe_sum);
     //}
+    h2_tof_npe    ->Fill(tr_tof,ac_npe_sum);
+    h2_Tdiff1_npe ->Fill(tr1_Tdiff,ac_npe_sum);
+    h2_Tdiff2_npe ->Fill(tr2_Tdiff,ac_npe_sum);
+    h2_Qtr1t_npe  ->Fill(tofadc_t[0],ac_npe_sum);
+    h2_Qtr1b_npe  ->Fill(tofadc_b[0],ac_npe_sum);
+    h2_Qtr2t_npe  ->Fill(tofadc_t[1],ac_npe_sum);
+    h2_Qtr2b_npe  ->Fill(tofadc_b[1],ac_npe_sum);
+
+    if(tofadc_t[0]>tr1t_Qmin && tofadc_t[0]<tr1t_Qmax &&
+       tofadc_b[0]>tr1b_Qmin && tofadc_b[0]<tr1b_Qmax &&
+       tofadc_t[1]>tr2t_Qmin && tofadc_t[1]<tr2t_Qmax &&
+       tofadc_b[1]>tr2b_Qmin && tofadc_b[1]<tr2b_Qmax){
+      hc_npe_AC1sum ->Fill(ac_npe_sum);
+    } 
 
     ///////////////
     //Remake tree//
@@ -299,7 +394,7 @@ void AC_ana::loop(){
         tr.trig_adc_t[i]  = tofadc_t[i];
         tr.trig_adc_b[i]  = tofadc_b[i];
       }
-      tr.trig_tof   = (tr_time_t[0]+tr_time_b[0])/2. -(tr_time_t[1]+tr_time_b[1])/2.;  
+      tr.trig_tof   = tr_tof;  
       tr.AC_time_t  = ac_time_t;
       tr.AC_time_b  = ac_time_b;
       tr.AC_adc_t   = acadc_t[0];
@@ -327,23 +422,35 @@ void AC_ana::draw(){
 
   c1->Clear();
   c1->Divide(4,4);
-  c1->cd(1); gPad->SetLogy(1);h_TDC_Trig1t ->Draw();
-  c1->cd(2); gPad->SetLogy(1);h_TDC_Trig1b ->Draw();
-  c1->cd(3); gPad->SetLogy(1);h_TDC_Trig2t ->Draw();
-  c1->cd(4); gPad->SetLogy(1);h_TDC_Trig2b ->Draw();
-  c1->cd(5); gPad->SetLogy(1);h_Q_Trig1t   ->Draw();
-  c1->cd(6); gPad->SetLogy(1);h_Q_Trig1b   ->Draw();
-  c1->cd(7); gPad->SetLogy(1);h_Q_Trig2t   ->Draw();
-  c1->cd(8); gPad->SetLogy(1);h_Q_Trig2b   ->Draw();
+  c1->cd(1); gPad->SetLogy(1);h_TDC_Trig1t    ->Draw();
+  c1->cd(2); gPad->SetLogy(1);h_TDC_Trig1b    ->Draw();
+  c1->cd(3); gPad->SetLogy(1);h_TDC_Trig2t    ->Draw();
+  c1->cd(4); gPad->SetLogy(1);h_TDC_Trig2b    ->Draw();
+  c1->cd(5); gPad->SetLogy(1);h_Q_Trig1t      ->Draw();
+  c1->cd(6); gPad->SetLogy(1);h_Q_Trig1b      ->Draw();
+  c1->cd(7); gPad->SetLogy(1);h_Q_Trig2t      ->Draw();
+  c1->cd(8); gPad->SetLogy(1);h_Q_Trig2b      ->Draw();
+  c1->cd(9); gPad->SetLogy(1);h_Tdiff_Trig1   ->Draw();
+  c1->cd(10);gPad->SetLogy(1);h_Tdiff_Trig2   ->Draw();
+  c1->cd(11);gPad->SetLogz(1);h2_Tdiff_Trig12 ->Draw("colz");
   c2->Clear();
   c2->Divide(4,4);
-  c2->cd(1); gPad->SetLogy(1);h_TDC_AC1t   ->Draw();
-  c2->cd(2); gPad->SetLogy(1);h_TDC_AC1b   ->Draw();
-  c2->cd(3); gPad->SetLogy(1);h_Q_AC1t     ->Draw();
-  c2->cd(4); gPad->SetLogy(1);h_Q_AC1b     ->Draw();
-  c2->cd(5); gPad->SetLogy(1);h_npe_AC1t   ->Draw();
-  c2->cd(6); gPad->SetLogy(1);h_npe_AC1b   ->Draw();
-  c2->cd(7); gPad->SetLogy(1);h_npe_AC1sum ->Draw();
+  c2->cd(1); gPad->SetLogy(1);h_TDC_AC1t    ->Draw();
+  c2->cd(2); gPad->SetLogy(1);h_TDC_AC1b    ->Draw();
+  c2->cd(3); gPad->SetLogy(1);h_Q_AC1t      ->Draw();
+  c2->cd(4); gPad->SetLogy(1);h_Q_AC1b      ->Draw();
+  c2->cd(5); gPad->SetLogy(1);h_npe_AC1t    ->Draw();
+  c2->cd(6); gPad->SetLogy(1);h_npe_AC1b    ->Draw();
+  c2->cd(7); gPad->SetLogy(1);h_npe_AC1sum  ->Draw();hc_npe_AC1sum ->Draw("same");
+  c2->cd(8); gPad->SetLogz(1);h2_tof_npe    ->Draw("colz");
+  c2->cd(9); gPad->SetLogz(1);h2_Tdiff1_npe ->Draw("colz");
+  c2->cd(10);gPad->SetLogz(1);h2_Tdiff2_npe ->Draw("colz");
+  c2->cd(11);gPad->SetLogz(1);h2_Qtr1t_npe  ->Draw("colz");line_mage->DrawLine(tr1t_Qmin,h2_Qtr1t_npe->GetYaxis()->GetXmin(),tr1t_Qmin,h2_Qtr1t_npe->GetYaxis()->GetXmax());
+  c2->cd(12);gPad->SetLogz(1);h2_Qtr1b_npe  ->Draw("colz");line_mage->DrawLine(tr1b_Qmin,h2_Qtr1b_npe->GetYaxis()->GetXmin(),tr1b_Qmin,h2_Qtr1b_npe->GetYaxis()->GetXmax());
+  c2->cd(13);gPad->SetLogz(1);h2_Qtr2t_npe  ->Draw("colz");line_mage->DrawLine(tr2t_Qmin,h2_Qtr2t_npe->GetYaxis()->GetXmin(),tr2t_Qmin,h2_Qtr2t_npe->GetYaxis()->GetXmax());
+  c2->cd(14);gPad->SetLogz(1);h2_Qtr2b_npe  ->Draw("colz");line_mage->DrawLine(tr2b_Qmin,h2_Qtr2b_npe->GetYaxis()->GetXmin(),tr2b_Qmin,h2_Qtr2b_npe->GetYaxis()->GetXmax());
+  c2->cd(15);gPad->SetLogy(1);hc_npe_AC1sum ->Draw();
+    
   c3->Clear();
   c4->Clear();
   c5->Clear();
@@ -360,6 +467,11 @@ void AC_ana::savecanvas(string ofname){
   c2->Print(Form("%s" ,ofname_pdf.c_str()));
   c2->Print(Form("%s]",ofname_pdf.c_str()));
   cout<<ofname_pdf.c_str()<<" saved"<<endl;
+}
+////////////////////////////////////////////////////////////////////////////
+bool AC_ana::CheckADCRange(double adc){
+  if(adc>400. && adc<4000.)return true;
+  else return false;
 }
 ////////////////////////////////////////////////////////////////////////////
 //////////////////////////// main //////////////////////////////////////////

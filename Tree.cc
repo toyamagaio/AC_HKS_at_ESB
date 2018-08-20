@@ -66,9 +66,9 @@ void Tree::read_one_event(int n)
 {
   tree->GetEntry(n);
   toftdc_t[0]=T00[0];tofadc_t[0]=A00[0];
-  toftdc_b[0]=T01[0];tofadc_b[0]=A01[0];
+  toftdc_b[0]=T03[0];tofadc_b[0]=A01[0];
   toftdc_t[1]=T02[0];tofadc_t[1]=A02[0];
-  toftdc_b[1]=T03[0];tofadc_b[1]=A03[0];
+  toftdc_b[1]=T01[0];tofadc_b[1]=A03[0];
 
   actdc_t[0]=T04[0];acadc_t[0]=A04[0];
   actdc_b[0]=T05[0];acadc_b[0]=A05[0];

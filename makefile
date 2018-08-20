@@ -27,9 +27,9 @@ CXXFLAGS = -Wall -O2 $(ROOTFLAGS)
 CXXLIBS = $(ROOTLIBS)
 
 TARGET1=     AC_ana1
-OBJS1=       AC_ana1.o ParamMan.o Tree.o
+OBJS1=       AC_ana1.o ParamMan.o Tree.o Setting.o
 TARGET2=    Pedestal_ana
-OBJS2=      Pedestal_ana.o Tree.o
+OBJS2=      Pedestal_ana.o Tree.o Setting.o
 TARGET3=     AC_ana1_itabashi
 OBJS3=       AC_ana1_itabashi.o ParamMan.o Tree.o
 

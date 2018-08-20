@@ -209,8 +209,8 @@ void Ped_ana::loop(){
   for(int n=0;n<ENum;n++){
     read_one_event(n);
     if(n%100==0) cout<<n<<" / "<<ENum<<endl;
-    if(noise_flag && NDataA07!=1 && NDataA04!=1 && NDataA05!=1 && !CheckADCRange(noise_adc))continue;
-    if(!noise_flag && NDataA04!=1 && NDataA05!=1)continue;
+    if(noise_flag && (NDataA07!=1 || NDataA04!=1 || NDataA05!=1) && !CheckADCRange(noise_adc))continue;
+    if(!noise_flag && (NDataA04!=1 || NDataA05!=1))continue;
 
     ////////
     //Trig//
